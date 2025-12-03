@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
+import axios from 'axios';
 
-// Data Aksara Ngalagena
 const aksaraNgalagena = [
   { char: 'ᮊ', name: 'KA' },
   { char: 'ᮋ', name: 'QA' },
@@ -27,7 +27,6 @@ const aksaraNgalagena = [
   { char: 'ᮐ', name: 'ZA' },
 ];
 
-// Data Aksara Swara
 const aksaraSwara = [
   { char: 'ᮃ', name: 'A' },
   { char: 'ᮄ', name: 'E' },
@@ -43,12 +42,21 @@ interface Aksara {
   name: string;
 }
 
+interface PredictionResult {
+  class: string;
+  confidence: number;
+}
+
 const LatihanPage = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedAksara, setSelectedAksara] = useState<Aksara | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<'ngalagena' | 'swara'>('ngalagena');
   const [context, setContext] = useState<CanvasRenderingContext2D | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
+
+  const API_URL = 'http://localhost:5000'; 
 
   const currentAksaraList = selectedCategory === 'ngalagena' ? aksaraNgalagena : aksaraSwara;
 
@@ -57,6 +65,10 @@ const LatihanPage = () => {
     if (canvas) {
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        // Set background putih
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.strokeStyle = '#000';
@@ -64,11 +76,135 @@ const LatihanPage = () => {
         setContext(ctx);
       }
     }
+
+    checkBackendHealth();
   }, []);
+
+  const checkBackendHealth = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/health`);
+      console.log('Backend health:', response.data);
+    } catch (error) {
+      console.error('Backend not reachable:', error);
+      alert('Backend server tidak dapat dijangkau. Pastikan Flask server sudah running.');
+    }
+  };
+
+  const canvasToBlob = (): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const canvas = canvasRef.current;
+      if (canvas && context) {
+        // Buat canvas temporary untuk ensure background putih
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        if (tempCtx) {
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = canvas.height;
+          
+          // Fill dengan background putih
+          tempCtx.fillStyle = 'white';
+          tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+          
+          // Draw canvas asli di atas background putih
+          tempCtx.drawImage(canvas, 0, 0);
+          
+          // Convert ke JPEG dengan quality 0.95
+          tempCanvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+          }, 'image/jpeg', 0.95);
+        }
+      }
+    });
+  };
+
+  // Fungsi untuk save blob sebagai file
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const predictDrawing = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !context) return;
+
+    // Cek apakah canvas kosong (cek apakah ada pixel hitam)
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = imageData.data;
+    let hasDrawing = false;
+    
+    for (let i = 0; i < pixels.length; i += 4) {
+      const r = pixels[i];
+      const g = pixels[i + 1];
+      const b = pixels[i + 2];
+      // Cek apakah pixel bukan putih
+      if (r < 250 || g < 250 || b < 250) {
+        hasDrawing = true;
+        break;
+      }
+    }
+
+    if (!hasDrawing) {
+      alert('Canvas kosong! Silakan tulis aksara terlebih dahulu.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setPrediction(null);
+
+      // Convert canvas to blob (JPEG dengan background putih)
+      const blob = await canvasToBlob();
+      
+      // SAVE BLOB UNTUK ANALISIS
+      // const timestamp = new Date().getTime();
+      // downloadBlob(blob, `canvas_${timestamp}.jpg`);
+      // console.log('Canvas blob saved for analysis as JPG with white background');
+      
+      // Create FormData
+      const formData = new FormData();
+      formData.append('image', blob, 'drawing.jpg');
+
+      // Send to backend
+      const response = await axios.post(`${API_URL}/predict`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      if (response.data.success) {
+        setPrediction({
+          class: response.data.prediction.class,
+          confidence: response.data.prediction.confidence
+        });
+        
+        console.log('Top 3 predictions:', response.data.top_predictions);
+      } else {
+        alert('Prediksi gagal: ' + response.data.error);
+      }
+
+    } catch (error) {
+      console.error('Error during prediction:', error);
+      if (axios.isAxiosError(error)) {
+        alert('Gagal terhubung ke server. Pastikan Flask server sudah running di ' + API_URL);
+      } else {
+        alert('Gagal melakukan prediksi');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!context) return;
     setIsDrawing(true);
+    setPrediction(null);
     const rect = canvasRef.current?.getBoundingClientRect();
     if (rect) {
       context.beginPath();
@@ -92,7 +228,10 @@ const LatihanPage = () => {
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     if (canvas && context) {
-      context.clearRect(0, 0, canvas.width, canvas.height);
+      // Clear dengan background putih
+      context.fillStyle = 'white';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      setPrediction(null);
     }
   };
 
@@ -116,7 +255,6 @@ const LatihanPage = () => {
             Pilih aksara yang ingin Anda pelajari dari daftar di bawah ini. Lalu tuliskan di kanvas samping.
           </p>
 
-          {/* Category Tabs */}
           <div className="flex gap-2.5 mb-5">
             <button
               className={`px-6 py-3 rounded-lg text-base cursor-pointer transition-all border-2 ${
@@ -140,7 +278,6 @@ const LatihanPage = () => {
             </button>
           </div>
 
-          {/* Aksara Grid */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-5">
             {currentAksaraList.map((aksara, index) => (
               <div
@@ -169,7 +306,7 @@ const LatihanPage = () => {
         </div>
 
         <div className="flex-1 flex flex-col items-center gap-5">
-          <div className="relative bg-white rounded-2xl p-5 shadow-xl">
+          <div className="relative bg-white rounded-2xl p-5 shadow-xl w-full max-w-[520px]">
             <button
               className="absolute top-4 right-4 bg-white border-2 border-gray-300 rounded-lg px-3 py-2 text-xl cursor-pointer transition-all z-10 hover:bg-red-50 hover:border-red-500"
               onClick={clearCanvas}
@@ -180,16 +317,48 @@ const LatihanPage = () => {
               ref={canvasRef}
               width={500}
               height={500}
-              className="border-2 border-gray-300 rounded-lg cursor-crosshair block bg-gray-50 max-w-full"
+              className="border-2 border-gray-300 rounded-lg cursor-crosshair block w-full"
+              style={{ backgroundColor: 'white' }}
               onMouseDown={startDrawing}
               onMouseMove={draw}
               onMouseUp={stopDrawing}
               onMouseLeave={stopDrawing}
             />
           </div>
-          <button className="bg-red-500 text-white border-none rounded-xl px-12 py-4 text-lg font-semibold cursor-pointer transition-all shadow-lg shadow-red-500/30 hover:bg-red-600 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-red-500/40 active:translate-y-0">
-            Periksa Tulisan
+
+          <button 
+            className={`bg-red-500 text-white border-none rounded-xl px-12 py-4 text-lg font-semibold cursor-pointer transition-all shadow-lg shadow-red-500/30 hover:bg-red-600 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-red-500/40 active:translate-y-0 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:shadow-none`}
+            onClick={predictDrawing}
+            disabled={isLoading}
+          >
+            {isLoading ? 'Memproses...' : 'Prediksi Tulisan'}
           </button>
+
+          {prediction && (
+            <div className="bg-white rounded-xl p-6 shadow-lg w-full max-w-[520px] border-2 border-green-500">
+              <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">Hasil Prediksi</h3>
+              <div className="flex flex-col items-center gap-3">
+                <div className="text-6xl font-sundanese">{currentAksaraList.find(a => a.name === prediction.class)?.char || '?'}</div>
+                <div className="text-3xl font-bold text-red-500">{prediction.class}</div>
+                <div className="text-lg text-gray-600">
+                  Confidence: <span className="font-semibold text-green-600">{prediction.confidence.toFixed(2)}%</span>
+                </div>
+                {selectedAksara && (
+                  <div className={`mt-4 p-4 rounded-lg w-full text-center ${
+                    selectedAksara.name === prediction.class 
+                      ? 'bg-green-50 border-2 border-green-500' 
+                      : 'bg-red-50 border-2 border-red-500'
+                  }`}>
+                    {selectedAksara.name === prediction.class ? (
+                      <p className="text-green-700 font-semibold">✓ Benar! Tulisan Anda sesuai</p>
+                    ) : (
+                      <p className="text-red-700 font-semibold">✗ Kurang tepat. Seharusnya: {selectedAksara.name}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

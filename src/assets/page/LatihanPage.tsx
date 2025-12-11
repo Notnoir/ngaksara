@@ -29,12 +29,12 @@ const aksaraNgalagena = [
 
 const aksaraSwara = [
   { char: 'ᮃ', name: 'A' },
-  { char: 'ᮄ', name: 'E' },
-  { char: 'ᮅ', name: 'EU' },
-  { char: 'ᮆ', name: 'I' },
+  { char: 'ᮄ', name: 'I' },
+  { char: 'ᮅ', name: 'U' },
+  { char: 'ᮆ', name: 'AE' },
   { char: 'ᮇ', name: 'O' },
-  { char: 'ᮈ', name: 'U' },
-  { char: 'ᮉ', name: 'É' },
+  { char: 'ᮈ', name: 'E' },
+  { char: 'ᮉ', name: 'EU' },
 ];
 
 interface Aksara {
@@ -345,11 +345,11 @@ const LatihanPage = () => {
                 </div>
                 {selectedAksara && (
                   <div className={`mt-4 p-4 rounded-lg w-full text-center ${
-                    selectedAksara.name === prediction.class 
+                    selectedAksara.name.toUpperCase() === prediction.class.toUpperCase() 
                       ? 'bg-green-50 border-2 border-green-500' 
                       : 'bg-red-50 border-2 border-red-500'
                   }`}>
-                    {selectedAksara.name === prediction.class ? (
+                    {selectedAksara.name.toUpperCase() === prediction.class.toUpperCase() ? (
                       <p className="text-green-700 font-semibold">✓ Benar! Tulisan Anda sesuai</p>
                     ) : (
                       <p className="text-red-700 font-semibold">✗ Kurang tepat. Seharusnya: {selectedAksara.name}</p>

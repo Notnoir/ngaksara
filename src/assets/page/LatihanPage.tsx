@@ -72,7 +72,7 @@ const LatihanPage = () => {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.strokeStyle = '#000';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 8;
         setContext(ctx);
       }
     }

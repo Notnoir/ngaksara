@@ -47,7 +47,11 @@ interface PredictionResult {
   confidence: number;
 }
 
-const LatihanPage = () => {
+interface LatihanPageProps {
+  onBack?: () => void;
+}
+
+const LatihanPage = ({ onBack }: LatihanPageProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedAksara, setSelectedAksara] = useState<Aksara | null>(null);
@@ -206,17 +210,33 @@ const LatihanPage = () => {
     setIsDrawing(true);
     setPrediction(null);
     const rect = canvasRef.current?.getBoundingClientRect();
-    if (rect) {
+    const canvas = canvasRef.current;
+    if (rect && canvas) {
+      // Calculate scale ratio between display size and canvas internal size
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      
       context.beginPath();
-      context.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+      context.moveTo(
+        (e.clientX - rect.left) * scaleX, 
+        (e.clientY - rect.top) * scaleY
+      );
     }
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !context) return;
     const rect = canvasRef.current?.getBoundingClientRect();
-    if (rect) {
-      context.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+    const canvas = canvasRef.current;
+    if (rect && canvas) {
+      // Calculate scale ratio between display size and canvas internal size
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      
+      context.lineTo(
+        (e.clientX - rect.left) * scaleX, 
+        (e.clientY - rect.top) * scaleY
+      );
       context.stroke();
     }
   };
@@ -240,9 +260,12 @@ const LatihanPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-5">
+    <div className="min-h-screen bg-background-light p-5">
       <header className="mb-8">
-        <button className="bg-white border border-gray-300 rounded-lg px-5 py-2.5 text-base cursor-pointer mb-5 hover:bg-gray-50 transition-all">
+        <button 
+          className="bg-white border border-gray-300 rounded-full px-5 py-2.5 text-base cursor-pointer mb-5 hover:bg-gray-50 transition-all"
+          onClick={onBack}
+        >
           ← Kembali
         </button>
         <h1 className="text-red-500 text-5xl font-bold my-2.5">Latihan menulis</h1>
@@ -257,7 +280,7 @@ const LatihanPage = () => {
 
           <div className="flex gap-2.5 mb-5">
             <button
-              className={`px-6 py-3 rounded-lg text-base cursor-pointer transition-all border-2 ${
+              className={`px-6 py-3 rounded-full text-base cursor-pointer transition-all border-2 ${
                 selectedCategory === 'ngalagena'
                   ? 'bg-red-500 text-white border-red-500'
                   : 'bg-white border-gray-300 hover:border-red-500 hover:text-red-500'
@@ -267,7 +290,7 @@ const LatihanPage = () => {
               Aksara Ngalagena
             </button>
             <button
-              className={`px-6 py-3 rounded-lg text-base cursor-pointer transition-all border-2 ${
+              className={`px-6 py-3 rounded-full text-base cursor-pointer transition-all border-2 ${
                 selectedCategory === 'swara'
                   ? 'bg-red-500 text-white border-red-500'
                   : 'bg-white border-gray-300 hover:border-red-500 hover:text-red-500'
@@ -282,7 +305,7 @@ const LatihanPage = () => {
             {currentAksaraList.map((aksara, index) => (
               <div
                 key={index}
-                className={`bg-white border-2 rounded-xl p-5 text-center cursor-pointer transition-all relative hover:-translate-y-0.5 hover:shadow-lg ${
+                className={`bg-white border-2 rounded-md p-5 text-center cursor-pointer transition-all relative hover:-translate-y-0.5 hover:shadow-lg ${
                   selectedAksara?.name === aksara.name
                     ? 'border-red-500 bg-red-50'
                     : 'border-gray-300 hover:border-red-500'
@@ -308,7 +331,7 @@ const LatihanPage = () => {
         <div className="flex-1 flex flex-col items-center gap-5">
           <div className="relative bg-white rounded-2xl p-5 shadow-xl w-full max-w-[520px]">
             <button
-              className="absolute top-4 right-4 bg-white border-2 border-gray-300 rounded-lg px-3 py-2 text-xl cursor-pointer transition-all z-10 hover:bg-red-50 hover:border-red-500"
+              className="absolute top-4 right-4 bg-white border-2 border-gray-300 rounded-full px-3 py-2 text-xl cursor-pointer transition-all z-10 hover:bg-red-50 hover:border-red-500"
               onClick={clearCanvas}
             >
               🗑️
@@ -317,7 +340,7 @@ const LatihanPage = () => {
               ref={canvasRef}
               width={500}
               height={500}
-              className="border-2 border-gray-300 rounded-lg cursor-crosshair block w-full"
+              className="border-2 border-gray-300 rounded-md cursor-crosshair block w-full"
               style={{ backgroundColor: 'white' }}
               onMouseDown={startDrawing}
               onMouseMove={draw}
@@ -335,7 +358,7 @@ const LatihanPage = () => {
           </button>
 
           {prediction && (
-            <div className="bg-white rounded-xl p-6 shadow-lg w-full max-w-[520px] border-2 border-green-500">
+            <div className="bg-white rounded-md p-6 shadow-lg w-full max-w-[520px] border-2 border-green-500">
               <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">Hasil Prediksi</h3>
               <div className="flex flex-col items-center gap-3">
                 <div className="text-6xl font-sundanese">{currentAksaraList.find(a => a.name === prediction.class)?.char || '?'}</div>
@@ -344,7 +367,7 @@ const LatihanPage = () => {
                   Confidence: <span className="font-semibold text-green-600">{prediction.confidence.toFixed(2)}%</span>
                 </div>
                 {selectedAksara && (
-                  <div className={`mt-4 p-4 rounded-lg w-full text-center ${
+                  <div className={`mt-4 p-4 rounded-md w-full text-center ${
                     selectedAksara.name.toUpperCase() === prediction.class.toUpperCase() 
                       ? 'bg-green-50 border-2 border-green-500' 
                       : 'bg-red-50 border-2 border-red-500'

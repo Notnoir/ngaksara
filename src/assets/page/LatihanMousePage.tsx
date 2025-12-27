@@ -1,3 +1,4 @@
+// src/assets/page/LatihanMousePage.tsx
 import { useRef, useState, useEffect } from 'react';
 import axios from 'axios';
 
@@ -47,11 +48,11 @@ interface PredictionResult {
   confidence: number;
 }
 
-interface LatihanPageProps {
+interface LatihanMousePageProps {
   onBack?: () => void;
 }
 
-const LatihanPage = ({ onBack }: LatihanPageProps) => {
+const LatihanMousePage = ({ onBack }: LatihanMousePageProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedAksara, setSelectedAksara] = useState<Aksara | null>(null);
@@ -69,10 +70,8 @@ const LatihanPage = ({ onBack }: LatihanPageProps) => {
     if (canvas) {
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        // Set background putih
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.strokeStyle = '#000';
@@ -90,7 +89,6 @@ const LatihanPage = ({ onBack }: LatihanPageProps) => {
       console.log('Backend health:', response.data);
     } catch (error) {
       console.error('Backend not reachable:', error);
-      alert('Backend server tidak dapat dijangkau. Pastikan Flask server sudah running.');
     }
   };
 
@@ -98,22 +96,16 @@ const LatihanPage = ({ onBack }: LatihanPageProps) => {
     return new Promise((resolve) => {
       const canvas = canvasRef.current;
       if (canvas && context) {
-        // Buat canvas temporary untuk ensure background putih
         const tempCanvas = document.createElement('canvas');
         const tempCtx = tempCanvas.getContext('2d');
         
         if (tempCtx) {
           tempCanvas.width = canvas.width;
           tempCanvas.height = canvas.height;
-          
-          // Fill dengan background putih
           tempCtx.fillStyle = 'white';
           tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-          
-          // Draw canvas asli di atas background putih
           tempCtx.drawImage(canvas, 0, 0);
           
-          // Convert ke JPEG dengan quality 0.95
           tempCanvas.toBlob((blob) => {
             if (blob) resolve(blob);
           }, 'image/jpeg', 0.95);
@@ -122,23 +114,10 @@ const LatihanPage = ({ onBack }: LatihanPageProps) => {
     });
   };
 
-  // Fungsi untuk save blob sebagai file
-  const downloadBlob = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
   const predictDrawing = async () => {
     const canvas = canvasRef.current;
     if (!canvas || !context) return;
 
-    // Cek apakah canvas kosong (cek apakah ada pixel hitam)
     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
     const pixels = imageData.data;
     let hasDrawing = false;
@@ -147,7 +126,6 @@ const LatihanPage = ({ onBack }: LatihanPageProps) => {
       const r = pixels[i];
       const g = pixels[i + 1];
       const b = pixels[i + 2];
-      // Cek apakah pixel bukan putih
       if (r < 250 || g < 250 || b < 250) {
         hasDrawing = true;
         break;
@@ -163,19 +141,10 @@ const LatihanPage = ({ onBack }: LatihanPageProps) => {
       setIsLoading(true);
       setPrediction(null);
 
-      // Convert canvas to blob (JPEG dengan background putih)
       const blob = await canvasToBlob();
-      
-      // SAVE BLOB UNTUK ANALISIS
-      // const timestamp = new Date().getTime();
-      // downloadBlob(blob, `canvas_${timestamp}.jpg`);
-      // console.log('Canvas blob saved for analysis as JPG with white background');
-      
-      // Create FormData
       const formData = new FormData();
       formData.append('image', blob, 'drawing.jpg');
 
-      // Send to backend
       const response = await axios.post(`${API_URL}/predict`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -212,7 +181,6 @@ const LatihanPage = ({ onBack }: LatihanPageProps) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     const canvas = canvasRef.current;
     if (rect && canvas) {
-      // Calculate scale ratio between display size and canvas internal size
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
       
@@ -229,7 +197,6 @@ const LatihanPage = ({ onBack }: LatihanPageProps) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     const canvas = canvasRef.current;
     if (rect && canvas) {
-      // Calculate scale ratio between display size and canvas internal size
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
       
@@ -248,7 +215,6 @@ const LatihanPage = ({ onBack }: LatihanPageProps) => {
   const clearCanvas = () => {
     const canvas = canvasRef.current;
     if (canvas && context) {
-      // Clear dengan background putih
       context.fillStyle = 'white';
       context.fillRect(0, 0, canvas.width, canvas.height);
       setPrediction(null);
@@ -268,8 +234,13 @@ const LatihanPage = ({ onBack }: LatihanPageProps) => {
         >
           ← Kembali
         </button>
-        <h1 className="text-red-500 text-5xl font-bold my-2.5">Latihan menulis</h1>
-        <h2 className="text-gray-800 text-4xl font-semibold my-1.5">Aksara Sunda</h2>
+        <div className="flex items-center gap-3 mb-4">
+          <h1 className="text-red-500 text-5xl font-bold">Latihan menulis</h1>
+          <span className="px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
+            🖱️ Mode: Mouse
+          </span>
+        </div>
+        <h2 className="text-gray-800 text-4xl font-semibold">Aksara Sunda</h2>
       </header>
 
       <div className="flex gap-8 max-w-[1400px] mx-auto flex-col lg:flex-row">
@@ -321,10 +292,6 @@ const LatihanPage = ({ onBack }: LatihanPageProps) => {
                 <div className="text-sm font-semibold text-gray-800">{aksara.name}</div>
               </div>
             ))}
-          </div>
-
-          <div className="text-center text-gray-600 text-sm">
-            <span>1 / {Math.ceil(currentAksaraList.length / 12)}</span>
           </div>
         </div>
 
@@ -388,4 +355,4 @@ const LatihanPage = ({ onBack }: LatihanPageProps) => {
   );
 };
 
-export default LatihanPage;
+export default LatihanMousePage;

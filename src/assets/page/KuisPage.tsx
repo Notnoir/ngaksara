@@ -91,7 +91,7 @@ const KuisPage = ({ onBack }: KuisPageProps) => {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.strokeStyle = '#000';
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 8;
         setContext(ctx);
       }
     }
